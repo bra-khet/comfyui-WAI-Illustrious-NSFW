@@ -12,16 +12,39 @@ variable "COMFYUI_VERSION" {
   default = "v0.18.2"
 }
 variable "MANAGER_SHA" {
-  default = "66108ccdbc8c"
+  default = "56a54117ab6b"
 }
 variable "KJNODES_SHA" {
-  default = "4e1458c2417d"
+  default = "369c8aee9ad4"
 }
 variable "CIVICOMFY_SHA" {
   default = "555e984bbcb0"
 }
 variable "RUNPODDIRECT_SHA" {
   default = "8be7b2206b75"
+}
+
+# === Snapshot Custom Nodes (from user's 2026-05-31 production ComfyUI) ===
+# These are the git-tracked nodes captured in .ignore/2026-05-31_14-48-25_snapshot.json
+# Values refreshed via scripts/fetch-hashes.sh (2026-06 run)
+# We add them using the same pinned-tarball + git-init pattern as the core four.
+# Decision: Bake the highest-value ones for reliability (Impact-Pack, IPAdapter, Inpaint-CropAndStitch, etc.).
+# Lower priority or very heavy nodes may stay Manager-install only.
+
+variable "IMPACT_PACK_SHA" {
+  default = "429d0159ad42"
+}
+variable "IPADAPTER_PLUS_SHA" {
+  default = "a0f451a5113c"
+}
+variable "INPAINT_CROP_AND_STITCH_SHA" {
+  default = "3617559bcb9d"
+}
+variable "INO_NODES_SHA" {
+  default = "0a5288386fb0"
+}
+variable "ATLAS_CLOUD_SHA" {
+  default = "c8d26995a844"
 }
 # Regular image (cu128)
 variable "TORCH_VERSION" {
@@ -65,6 +88,12 @@ target "common" {
     KJNODES_SHA         = KJNODES_SHA
     CIVICOMFY_SHA       = CIVICOMFY_SHA
     RUNPODDIRECT_SHA    = RUNPODDIRECT_SHA
+    # Sprint 3 snapshot nodes — must be passed so Dockerfile can use ${VAR}
+    IMPACT_PACK_SHA             = IMPACT_PACK_SHA
+    IPADAPTER_PLUS_SHA          = IPADAPTER_PLUS_SHA
+    INPAINT_CROP_AND_STITCH_SHA = INPAINT_CROP_AND_STITCH_SHA
+    INO_NODES_SHA               = INO_NODES_SHA
+    ATLAS_CLOUD_SHA             = ATLAS_CLOUD_SHA
     TORCH_VERSION       = TORCH_VERSION
     TORCHVISION_VERSION = TORCHVISION_VERSION
     TORCHAUDIO_VERSION  = TORCHAUDIO_VERSION

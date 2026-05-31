@@ -104,16 +104,30 @@ start_jupyter() {
     echo "Jupyter Lab started"
 }
 
-# Download optional initial Civitai checkpoints declared via env var (MVP per 2026-06 sprint)
-# Supports: CIVITAI_API_KEY (or CIVITAI_TOKEN fallback) + COMFY_INITIAL_MODELS="123456,789012"
-# Behavior: idempotent (marker file + disk existence check), best-effort (never breaks pod), runs every start
+# ----------------------------------------------------------------------------
+# download_civitai_checkpoints (added 2026-06 parallel sprint)
+#
+# Optional quality-of-life feature: Declarative Civitai checkpoint auto-download.
+# Triggered by two RunPod template environment variables:
+#   CIVITAI_API_KEY (or CIVITAI_TOKEN fallback)
+#   COMFY_INITIAL_MODELS="versionId1,versionId2,..."
+#
+# Design goals (per project principles):
+# - Image stays lean (no models baked).
+# - Fully idempotent (marker file + filesystem check).
+# - Best-effort: never breaks pod startup on bad ID, rate limit, or missing key.
+# - Runs on *every* start (cheap no-op when nothing to do).
+# - Keys are also exported via the widened export_env_vars() for Civicomfy + CLI tools.
+#
+# Future: This same pattern can be extended for LoRAs if desired.
+# ----------------------------------------------------------------------------
 download_civitai_checkpoints() {
     local models_var="${COMFY_INITIAL_MODELS:-}"
     local key="${CIVITAI_API_KEY:-${CIVITAI_TOKEN:-}}"
 
-    # CHANGED: New function for declarative first-boot / every-start model pulls
-    # WHY: User wants the same "set key + comma list of Civitai version IDs in RunPod template env vars, blank means do nothing" experience seen in other templates, while keeping the image lean and volumes fully user-owned
-    # Sync: Keep behavior consistent with the first-boot guidance echo block and SETUP.md docs
+    # CHANGED: New function for declarative first-boot / every-start model pulls (Civitai only, MVP)
+    # WHY: Quality-of-life feature present in many other RunPod ComfyUI templates. Keeps this personal fork competitive while preserving "lean image + everything on user volume" contract.
+    # Sync: export_env_vars() (CIVITAI_ / HF_ widening), first-boot guidance block above, SETUP.md "Optional: API Keys + Auto-Download Models" section, and future LoRA extension work.
 
     [ -z "$models_var" ] && return 0
     if [ -z "$key" ]; then
@@ -216,7 +230,10 @@ if [ -d "$OLD_VENV_DIR" ] && [ ! -d "$VENV_DIR" ]; then
     source "$VENV_DIR/bin/activate"
     python -m ensurepip
     # Skip nodes baked into the image — their deps are in system site-packages
-    BAKED_NODES="ComfyUI-Manager ComfyUI-KJNodes Civicomfy ComfyUI-RunpodDirect"
+    # CHANGED (Sprint 3): All 5 git nodes from the 2026-05-31 snapshot are now baked
+    # WHY: So their heavy dependencies (insightface, onnxruntime, etc.) are pre-installed in the system site-packages
+    # Sync: Must match the directory names created in the Dockerfile download block
+    BAKED_NODES="ComfyUI-Manager ComfyUI-KJNodes Civicomfy ComfyUI-RunpodDirect ComfyUI-Impact-Pack ComfyUI_IPAdapter_plus ComfyUI-Inpaint-CropAndStitch ComfyUI-InoNodes atlascloud_comfyui"
     CURRENT=0
     INSTALLED=0
     for req in "$COMFYUI_DIR"/custom_nodes/*/requirements.txt; do
@@ -247,26 +264,76 @@ if [ ! -d "$COMFYUI_DIR" ] || [ ! -d "$VENV_DIR" ]; then
         cp -r /opt/comfyui-baked "$COMFYUI_DIR"
         echo "ComfyUI copied to workspace"
 
-        # === WAI-Illustrious personal template guidance (Sprint 2 addition) ===
+        # === Sprint 4: Create comfortable, boilerplate directory structure ===
+        # We support two model locations for flexibility:
+        #   1. Simple root-level (recommended for most users): /workspace/models/...
+        #   2. Traditional nested: /workspace/runpod-slim/ComfyUI/models/...
+        #
+        # extra_model_paths.yaml makes ComfyUI see models in both places.
+        mkdir -p /workspace/models/checkpoints \
+                 /workspace/models/loras \
+                 /workspace/models/vae \
+                 /workspace/models/embeddings \
+                 /workspace/models/controlnet \
+                 /workspace/models/upscale_models \
+                 /workspace/models/diffusers \
+                 /workspace/workflows
+
+        # Create a sensible default extra_model_paths.yaml if it doesn't exist.
+        # This lets users drop models in the simple /workspace/models structure
+        # while still supporting the classic nested location.
+        EXTRA_PATHS_FILE="$COMFYUI_DIR/extra_model_paths.yaml"
+        if [ ! -f "$EXTRA_PATHS_FILE" ]; then
+            cat > "$EXTRA_PATHS_FILE" << 'EOF'
+# Default extra model paths for this template (Sprint 4)
+# Feel free to edit or delete this file.
+
+comfyui_extra_model_paths:
+  base_path: /workspace
+  models:
+    checkpoints: models/checkpoints
+    loras: models/loras
+    vae: models/vae
+    embeddings: models/embeddings
+    controlnet: models/controlnet
+    upscale_models: models/upscale_models
+    diffusers: models/diffusers
+
+  # Also keep the traditional location inside the ComfyUI folder for compatibility
+  # (in case you already have models there)
+  runpod-slim/ComfyUI:
+    checkpoints: models/checkpoints
+    loras: models/loras
+    vae: models/vae
+    embeddings: models/embeddings
+EOF
+            echo "Created default extra_model_paths.yaml"
+        fi
+
+        # === WAI-Illustrious personal template guidance (updated Sprint 4) ===
         echo "======================================================================"
         echo "  WAI-Illustrious Live Pod — Recommended Volume Layout"
         echo "======================================================================"
-        echo "Place your models here (nested inside the ComfyUI tree on the volume):"
-        echo "  /workspace/runpod-slim/ComfyUI/models/checkpoints/   ← WAI-Illustrious.safetensors"
-        echo "  /workspace/runpod-slim/ComfyUI/models/loras/         ← your character / anatomy / style LoRAs"
-        echo "  /workspace/runpod-slim/ComfyUI/models/vae/"
-        echo "  /workspace/runpod-slim/ComfyUI/models/embeddings/"
+        echo "Simple & recommended layout (most users):"
+        echo "  /workspace/models/checkpoints/   ← Drop WAI-Illustrious here"
+        echo "  /workspace/models/loras/         ← Your LoRAs"
+        echo "  /workspace/models/vae/"
+        echo "  /workspace/models/embeddings/"
+        echo "  /workspace/models/controlnet/"
         echo ""
-        echo "Outputs and workflows will be saved under:"
-        echo "  /workspace/runpod-slim/ComfyUI/output/"
-        echo "  /workspace/runpod-slim/ComfyUI/user/default/workflows/"
+        echo "Workflows (easy drag & drop):"
+        echo "  /workspace/workflows/"
         echo ""
-        echo "This nested layout is the recommended structure for this template."
-        echo "It survives image updates and works consistently across deploys."
+        echo "Alternative (traditional) location also works:"
+        echo "  /workspace/runpod-slim/ComfyUI/models/..."
         echo ""
-        echo "Alternative (new): set CIVITAI_API_KEY + COMFY_INITIAL_MODELS=\"123456,789012\""
-        echo "in your RunPod template env vars. On any start the pod will auto-download"
-        echo "those Civitai checkpoint versions (idempotent). Leave the var blank for zero downloads."
+        echo "The template automatically makes ComfyUI see models in both places"
+        echo "via extra_model_paths.yaml."
+        echo ""
+        echo "Two ways to get checkpoints:"
+        echo "  1. Manual copy via FileBrowser / SSH / Jupyter"
+        echo "  2. Declarative: Set CIVITAI_API_KEY + COMFY_INITIAL_MODELS in your RunPod template"
+        echo "     (auto-downloads on every start, idempotent)"
         echo "======================================================================"
     fi
 

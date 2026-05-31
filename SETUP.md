@@ -226,15 +226,22 @@ Access:
 
 ---
 
-## First Boot Experience (Sprint 2 improvement)
+## First Boot Experience & Volume Layout (Sprint 4)
 
-On the very first time your volume is used with this image, after ComfyUI is copied you will now see a clear block in the logs telling you exactly where to place:
+On first boot the template creates a comfortable, boilerplate directory structure and generates an `extra_model_paths.yaml` so ComfyUI can find models in two locations:
 
-- WAI-Illustrious checkpoint (`.../models/checkpoints/`)
-- Your LoRAs (`.../models/loras/`)
-- Other assets
+**Recommended simple layout (most users):**
+- `/workspace/models/checkpoints/`
+- `/workspace/models/loras/`
+- `/workspace/models/vae/`, `embeddings/`, `controlnet/`, etc.
+- `/workspace/workflows/` — easy place to drop your JSON workflows
 
-This uses the nested layout inside `/workspace/runpod-slim/ComfyUI/models/...` that you prefer. The message only appears during the initial copy.
+**Traditional nested location** also continues to work:
+- `/workspace/runpod-slim/ComfyUI/models/...`
+
+The generated `extra_model_paths.yaml` (inside the ComfyUI folder) makes both locations visible to ComfyUI automatically. You can edit or delete this file if you prefer a different structure.
+
+You will see clear guidance in the container logs on first boot explaining the layout and the two ways to get checkpoints (manual copy or the existing `CIVITAI_API_KEY` + `COMFY_INITIAL_MODELS` declarative method).
 
 ## Optional: API Keys + Auto-Download Models via Environment Variables (new)
 
@@ -313,7 +320,16 @@ The official base already gives us (pinned + baked):
 - **Civicomfy** — Civitai integration conveniences.
 - **ComfyUI-RunpodDirect** — RunPod-specific helpers.
 
-**For WAI-Illustrious + NSFW/character + video, this is already a very strong starting point.** We will only add the minimal high-signal nodes from your 2026-05-31 snapshot in future sprints (Impact-Pack + subpack, IPAdapter Plus, ControlNet Aux, rgthree-comfy, Inpaint-CropAndStitch, WanVideoWrapper, etc.).
+**For WAI-Illustrious + NSFW/character + video, this is already a very strong starting point.**
+
+**Sprint 3 complete**: The 5 git-tracked nodes from your exact 2026-05-31 production snapshot are now pre-baked:
+- ComfyUI-Impact-Pack
+- ComfyUI_IPAdapter_plus
+- ComfyUI-Inpaint-CropAndStitch
+- ComfyUI-InoNodes
+- atlascloud_comfyui
+
+All other nodes from that snapshot (WanVideoWrapper, rgthree-comfy, controlnet_aux, ComfyUI-Easy-Use, etc.) are left to ComfyUI-Manager so the image stays lean and heavy native dependencies are handled cleanly at runtime.
 
 ---
 
@@ -328,17 +344,17 @@ The official base already gives us (pinned + baked):
 
 ## File Locations Reference
 
-| Purpose                        | Path on Volume                                      |
-|--------------------------------|-----------------------------------------------------|
-| ComfyUI install (persistent)   | `/workspace/runpod-slim/ComfyUI`                    |
-| Custom launch args             | `/workspace/runpod-slim/comfyui_args.txt`           |
-| Checkpoints / models           | `/workspace/runpod-slim/ComfyUI/models/checkpoints` |
-| LoRAs                          | `/workspace/runpod-slim/ComfyUI/models/loras`       |
-| Outputs (images + video)       | `/workspace/runpod-slim/ComfyUI/output`             |
-| Workflows                      | `/workspace/runpod-slim/ComfyUI/user/default/workflows` |
-| Added custom nodes             | `/workspace/runpod-slim/ComfyUI/custom_nodes`       |
-| FileBrowser root               | `/workspace`                                        |
-| Jupyter root                   | `/workspace`                                        |
+| Purpose                        | Path on Volume (recommended)                          |
+|--------------------------------|-------------------------------------------------------|
+| ComfyUI install (persistent)   | `/workspace/runpod-slim/ComfyUI`                      |
+| Custom launch args             | `/workspace/runpod-slim/comfyui_args.txt`             |
+| Checkpoints / models           | `/workspace/models/checkpoints` (or nested)           |
+| LoRAs                          | `/workspace/models/loras` (or nested)                 |
+| Outputs                        | `/workspace/runpod-slim/ComfyUI/output` (default)     |
+| Workflows (easy drag & drop)   | `/workspace/workflows/`                               |
+| Added custom nodes             | `/workspace/runpod-slim/ComfyUI/custom_nodes`         |
+| FileBrowser root               | `/workspace`                                          |
+| Jupyter root                   | `/workspace`                                          |
 
 ---
 

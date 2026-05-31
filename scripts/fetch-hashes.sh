@@ -15,6 +15,11 @@ ltdrdata/ComfyUI-Manager|MANAGER_SHA
 kijai/ComfyUI-KJNodes|KJNODES_SHA
 MoonGoblinDev/Civicomfy|CIVICOMFY_SHA
 MadiatorLabs/ComfyUI-RunpodDirect|RUNPODDIRECT_SHA
+ltdrdata/ComfyUI-Impact-Pack|IMPACT_PACK_SHA
+cubiq/ComfyUI_IPAdapter_plus|IPADAPTER_PLUS_SHA
+lquesada/ComfyUI-Inpaint-CropAndStitch|INPAINT_CROP_AND_STITCH_SHA
+nobandegani/ComfyUI-InoNodes|INO_NODES_SHA
+AtlasCloudAI/atlascloud_comfyui|ATLAS_CLOUD_SHA
 "
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -53,7 +58,9 @@ echo "# Paste these into docker-bake.hcl to update"
 echo ""
 
 while IFS='|' read -r repo var_name; do
+  # Skip blank lines and comment lines (robust against future edits)
   [[ -z "$repo" ]] && continue
+  [[ "$repo" =~ ^[[:space:]]*# ]] && continue
 
   current=$(get_current_hash "$var_name")
   latest=$(fetch_latest_sha "$repo")

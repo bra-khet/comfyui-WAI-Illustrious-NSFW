@@ -79,7 +79,50 @@ This note exists so the same context-bleed error is never repeated in any Docker
 
 **End of Sprint 2 statement**: "Sprint 2 complete — personal naming centralized + first-boot UX guidance added. Environment ready for real RunPod testing and Sprint 3 (snapshot custom node integration)."
 
-Next up: Sprint 3 will focus on integrating the high-value nodes from the 2026-05-31 snapshot (Impact-Pack, IPAdapter, WanVideoWrapper, etc.) using the established pinned-tarball pattern.
+---
+
+## Parallel Sprint Work (Accepted Baseline) — Civitai Auto-Download Feature
+
+**Commit**: `b8b0248` — "Sprint: Add CIVITAI_API_KEY + COMFY_INITIAL_MODELS declarative checkpoint downloads (idempotent, best-effort) to start.sh + docs"
+
+**What was added** (from parallel session, now reviewed + polished for consistency):
+- New `download_civitai_checkpoints()` function in `start.sh`.
+- Widened `export_env_vars()` to propagate `CIVITAI_*` and `HF_*` variables (enables baked Civicomfy node + CLI tools).
+- Idempotent design using marker file `/workspace/runpod-slim/.initial_civitai_models` + disk check.
+- Best-effort: failures log and continue; pod never breaks.
+- Runs on every container start (very cheap when `COMFY_INITIAL_MODELS` is unset).
+- First-boot guidance block updated to present both manual placement and the new declarative method.
+- Full user documentation added in SETUP.md ("Optional: API Keys + Auto-Download Models via Environment Variables").
+
+**Post-handoff integration polish performed**:
+- Strengthened function header comments + Claude.md style annotations.
+- Improved first-boot echo messaging for clarity.
+- Confirmed no conflict with lean image principle or runpod-slim first-boot contract.
+- Feature is intentionally MVP and designed to be extended later for LoRAs using the same pattern.
+
+This capability is now part of the accepted baseline for the personal WAI-Illustrious template.
+
+---
+
+---
+
+## Sprint 3 — COMPLETE (Snapshot Custom Node Integration)
+
+**Sprint contract**: Fully bake all 5 git-tracked custom nodes from the user's 2026-05-31 production snapshot into the image using the established pinned-tarball + git-init pattern. CNR nodes left to Manager.
+
+**Completed**:
+- All 5 snapshot git nodes are now pre-baked:
+  - ComfyUI-Impact-Pack
+  - ComfyUI_IPAdapter_plus
+  - ComfyUI-Inpaint-CropAndStitch
+  - ComfyUI-InoNodes
+  - atlascloud_comfyui
+- SHAs are maintained via `scripts/fetch-hashes.sh`.
+- Dockerfile fully updated (download tarballs + git init + remotes for all 5).
+- `start.sh` BAKED_NODES list updated so their Python deps are never re-installed during migrations.
+- CNR nodes (WanVideoWrapper, rgthree-comfy, comfyui_controlnet_aux, ComfyUI-Easy-Use, etc.) intentionally **not** baked — they remain installable via ComfyUI-Manager (keeps image size reasonable and handles heavy native dependencies gracefully at runtime).
+
+**Result**: The user's real production custom node set (the git ones) is now guaranteed on every fresh volume, exactly as requested.
 
 ---
 
@@ -160,13 +203,15 @@ These are mostly transitive from the above nodes. Key ones that benefit from bak
 - Update requirements aggregation and prebake-manager-cache if needed.
 - Test local build + basic pod deploy (user provides output).
 
-**Sprint 4 — Volume layout, model placement, and first-run experience**
-- Finalize recommended directory structure under /workspace (checkpoints, loras, vae, embeddings, workflows, output, input).
-- Possibly add a small `extra_model_paths.yaml` or symlinks / startup script help.
-- Document exact steps to place WAI-Illustrious checkpoint + LoRAs on volume.
-- Add any small quality-of-life (e.g. default workflows folder seeding?).
+**Sprint 4 — Volume layout, model placement, and first-run experience** (COMPLETE)
+- Added `extra_model_paths.yaml` generation on first boot so both `/workspace/models/...` (simple/recommended) and the nested ComfyUI path work.
+- Created standard boilerplate directories (`checkpoints`, `loras`, `workflows`, etc.) under the root-level recommended structure.
+- Updated first-boot guidance and documentation to present a comfortable, non-bare-bones starting point.
+- User confirmed: no LoRA pre-baking, video deprioritized, keep the template lightweight.
 
-**Sprint 5 — Video workflow readiness (Wan + others)**
+**Sprint 5 — Video workflow readiness (Wan + others)** (Deprioritized per user)
+- User is not using video workflows in this template (separate serverless worker exists).
+- Future work may include forking parts of this template into a serverless worker if needed.
 - Ensure WanVideoWrapper and related (if baked) have good volume paths for large video models.
 - GPU/VRAM guidance for SDXL + video decode.
 - Possibly light comfyui_args.txt suggestions for memory / attention.

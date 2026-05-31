@@ -11,6 +11,12 @@ ARG MANAGER_SHA
 ARG KJNODES_SHA
 ARG CIVICOMFY_SHA
 ARG RUNPODDIRECT_SHA
+# Sprint 3 snapshot nodes (must be declared here + passed from docker-bake.hcl)
+ARG IMPACT_PACK_SHA
+ARG IPADAPTER_PLUS_SHA
+ARG INPAINT_CROP_AND_STITCH_SHA
+ARG INO_NODES_SHA
+ARG ATLAS_CLOUD_SHA
 ARG TORCH_VERSION
 ARG TORCHVISION_VERSION
 ARG TORCHAUDIO_VERSION
@@ -62,7 +68,21 @@ RUN curl -fSL "https://github.com/ltdrdata/ComfyUI-Manager/archive/${MANAGER_SHA
     curl -fSL "https://github.com/MoonGoblinDev/Civicomfy/archive/${CIVICOMFY_SHA}.tar.gz" -o civicomfy.tar.gz && \
     mkdir -p Civicomfy && tar xzf civicomfy.tar.gz --strip-components=1 -C Civicomfy && rm civicomfy.tar.gz && \
     curl -fSL "https://github.com/MadiatorLabs/ComfyUI-RunpodDirect/archive/${RUNPODDIRECT_SHA}.tar.gz" -o runpoddirect.tar.gz && \
-    mkdir -p ComfyUI-RunpodDirect && tar xzf runpoddirect.tar.gz --strip-components=1 -C ComfyUI-RunpodDirect && rm runpoddirect.tar.gz
+    mkdir -p ComfyUI-RunpodDirect && tar xzf runpoddirect.tar.gz --strip-components=1 -C ComfyUI-RunpodDirect && rm runpoddirect.tar.gz && \
+    # === Sprint 3: User's 2026-05-31 production snapshot nodes (baked for reliability) ===
+    # CHANGED: Added all 5 git nodes from the snapshot (Impact-Pack, IPAdapter Plus, Inpaint-CropAndStitch, InoNodes, AtlasCloud)
+    # WHY: Reproduce the user's exact daily production environment on every fresh volume while keeping CNR nodes on Manager
+    # Sync: Must stay in sync with the 5 *_SHA variables in docker-bake.hcl, the git init block below, and BAKED_NODES in start.sh
+    curl -fSL "https://github.com/ltdrdata/ComfyUI-Impact-Pack/archive/${IMPACT_PACK_SHA}.tar.gz" -o impactpack.tar.gz && \
+    mkdir -p ComfyUI-Impact-Pack && tar xzf impactpack.tar.gz --strip-components=1 -C ComfyUI-Impact-Pack && rm impactpack.tar.gz && \
+    curl -fSL "https://github.com/cubiq/ComfyUI_IPAdapter_plus/archive/${IPADAPTER_PLUS_SHA}.tar.gz" -o ipadapter.tar.gz && \
+    mkdir -p ComfyUI_IPAdapter_plus && tar xzf ipadapter.tar.gz --strip-components=1 -C ComfyUI_IPAdapter_plus && rm ipadapter.tar.gz && \
+    curl -fSL "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch/archive/${INPAINT_CROP_AND_STITCH_SHA}.tar.gz" -o inpaintcrop.tar.gz && \
+    mkdir -p ComfyUI-Inpaint-CropAndStitch && tar xzf inpaintcrop.tar.gz --strip-components=1 -C ComfyUI-Inpaint-CropAndStitch && rm inpaintcrop.tar.gz && \
+    curl -fSL "https://github.com/nobandegani/ComfyUI-InoNodes/archive/${INO_NODES_SHA}.tar.gz" -o inonodes.tar.gz && \
+    mkdir -p ComfyUI-InoNodes && tar xzf inonodes.tar.gz --strip-components=1 -C ComfyUI-InoNodes && rm inonodes.tar.gz && \
+    curl -fSL "https://github.com/AtlasCloudAI/atlascloud_comfyui/archive/${ATLAS_CLOUD_SHA}.tar.gz" -o atlascloud.tar.gz && \
+    mkdir -p atlascloud_comfyui && tar xzf atlascloud.tar.gz --strip-components=1 -C atlascloud_comfyui && rm atlascloud.tar.gz
 
 # Init git repos with upstream remotes so ComfyUI-Manager can detect versions
 # and users can update via Manager at their own risk
@@ -80,9 +100,27 @@ RUN cd /tmp/build/ComfyUI && \
     git remote add origin https://github.com/MoonGoblinDev/Civicomfy.git && \
     cd /tmp/build/ComfyUI/custom_nodes/ComfyUI-RunpodDirect && \
     git init && git add -A && git -c user.name=- -c user.email=- commit -q -m "ComfyUI-RunpodDirect ${RUNPODDIRECT_SHA}" && \
-    git remote add origin https://github.com/MadiatorLabs/ComfyUI-RunpodDirect.git
+    git remote add origin https://github.com/MadiatorLabs/ComfyUI-RunpodDirect.git && \
+    # === Sprint 3 snapshot nodes git init (so ComfyUI-Manager can manage updates) ===
+    cd /tmp/build/ComfyUI/custom_nodes/ComfyUI-Impact-Pack && \
+    git init && git add -A && git -c user.name=- -c user.email=- commit -q -m "ComfyUI-Impact-Pack ${IMPACT_PACK_SHA}" && \
+    git remote add origin https://github.com/ltdrdata/ComfyUI-Impact-Pack.git && \
+    cd /tmp/build/ComfyUI/custom_nodes/ComfyUI_IPAdapter_plus && \
+    git init && git add -A && git -c user.name=- -c user.email=- commit -q -m "ComfyUI_IPAdapter_plus ${IPADAPTER_PLUS_SHA}" && \
+    git remote add origin https://github.com/cubiq/ComfyUI_IPAdapter_plus.git && \
+    cd /tmp/build/ComfyUI/custom_nodes/ComfyUI-Inpaint-CropAndStitch && \
+    git init && git add -A && git -c user.name=- -c user.email=- commit -q -m "ComfyUI-Inpaint-CropAndStitch ${INPAINT_CROP_AND_STITCH_SHA}" && \
+    git remote add origin https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git && \
+    cd /tmp/build/ComfyUI/custom_nodes/ComfyUI-InoNodes && \
+    git init && git add -A && git -c user.name=- -c user.email=- commit -q -m "ComfyUI-InoNodes ${INO_NODES_SHA}" && \
+    git remote add origin https://github.com/nobandegani/ComfyUI-InoNodes.git && \
+    cd /tmp/build/ComfyUI/custom_nodes/atlascloud_comfyui && \
+    git init && git add -A && git -c user.name=- -c user.email=- commit -q -m "atlascloud_comfyui ${ATLAS_CLOUD_SHA}" && \
+    git remote add origin https://github.com/AtlasCloudAI/atlascloud_comfyui.git
 
-# Generate lock file from all requirements (including torch pins), then install with hash verification
+# Generate lock file from all requirements (including torch pins).
+# Git/VCS dependencies are installed without hash verification first (impossible to hash),
+# then the remaining packages are installed with full --require-hashes for security.
 WORKDIR /tmp/build
 RUN cat ComfyUI/requirements.txt > requirements.in && \
     for node_dir in ComfyUI/custom_nodes/*/; do \
@@ -99,15 +137,29 @@ RUN cat ComfyUI/requirements.txt > requirements.in && \
     echo "torchvision==${TORCHVISION_VERSION}" >> constraints.txt && \
     echo "torchaudio==${TORCHAUDIO_VERSION}" >> constraints.txt && \
     echo "pillow>=12.1.1" >> constraints.txt && \
+    # Note: We deliberately handle git/VCS dependencies separately below because
+    # pip-compile + --require-hashes cannot generate hashes for them.
+    # This is required to support nodes from the user's production snapshot (e.g. sam-2).
     TORCH_INDEX_URL="https://download.pytorch.org/whl/${TORCH_INDEX_SUFFIX}" && \
     PIP_INDEX_URL=https://pypi.org/simple \
     PIP_EXTRA_INDEX_URL="${TORCH_INDEX_URL}" \
     PIP_CONSTRAINT=constraints.txt \
     pip-compile --generate-hashes --output-file=requirements.lock --strip-extras --allow-unsafe requirements.in && \
+    # Split VCS (git) dependencies from normal ones.
+    # pip --require-hashes cannot handle git URLs, so we must install them separately.
+    # This is required because several nodes from the user's 2026-05-31 snapshot
+    # (and their transitive deps) pull in packages like sam-2 via git.
+    grep -E '^\s*[^#].*(git\+|hg\+|bzr\+|svn\+)' requirements.lock > /tmp/vcs-requirements.txt || true && \
+    grep -v -E '^\s*[^#].*(git\+|hg\+|bzr\+|svn\+)' requirements.lock > /tmp/normal-requirements.txt || true && \
+    # Install VCS/git dependencies first (no hashes possible)
+    if [ -s /tmp/vcs-requirements.txt ]; then \
+        python3.12 -m pip install --no-cache-dir --no-deps -r /tmp/vcs-requirements.txt; \
+    fi && \
+    # Install the rest with full hash verification (security benefit preserved where possible)
     python3.12 -m pip install --no-cache-dir --ignore-installed --require-hashes \
     --index-url https://pypi.org/simple \
     --extra-index-url "${TORCH_INDEX_URL}" \
-    -r requirements.lock
+    -r /tmp/normal-requirements.txt
 
 # Pre-populate ComfyUI-Manager cache so first cold start skips the slow registry fetch
 COPY scripts/prebake-manager-cache.py /tmp/prebake-manager-cache.py
