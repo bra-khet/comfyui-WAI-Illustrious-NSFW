@@ -1,0 +1,60 @@
+# ============================================================================
+# .dockerignore — Personal WAI-Illustrious ComfyUI RunPod Template
+# ============================================================================
+# Purpose: Keep Docker build context small and image clean.
+# Only files actually used by the Dockerfile or copied at runtime should be sent.
+#
+# This fork deliberately excludes:
+# - Git history and CI definitions (never needed inside container)
+# - Personal snapshot / research data (.ignore/)
+# - Local test mounts
+# - Documentation that bloats the context tar
+#
+# The official base ships without a .dockerignore; adding one is a high-value
+# first-step improvement for anyone forking for personal use.
+
+# --- Version Control & Meta ---
+.git
+.gitignore
+.gitattributes
+.github/
+CHANGELOG.md
+LICENSE
+*.md
+
+# --- Personal / Research Data (explicitly never ship) ---
+.ignore/
+
+# --- Documentation (context only; not runtime) ---
+docs/
+
+# --- Build / Local Artifacts ---
+*.tar.gz
+*.tar
+workspace/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+.venv-cu128/
+
+# --- IDE / OS Noise ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.log
+
+# --- Scripts that are build-time only (we COPY specific ones explicitly) ---
+# We do send scripts/prebake-manager-cache.py because Dockerfile COPYs it.
+# fetch-hashes.sh is never copied into the image — no need to exclude explicitly.
+
+# Safety: never accidentally include a previous ComfyUI checkout if someone
+# runs docker build from inside a mounted workspace.
+ComfyUI/
+opt/
