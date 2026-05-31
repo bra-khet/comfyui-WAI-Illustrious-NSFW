@@ -13,6 +13,42 @@ This file captures the living plan for the personal fork of runpod-workers/comfy
 
 ---
 
+## Institutional Memory — Docker / Buildx / RunPod Image Work
+
+**Critical — Read before any future work on `docker-bake.hcl`, build scripts, or image tagging.**
+
+See the dedicated file: [docs/docker-buildx-bake-gotchas.md](docs/docker-buildx-bake-gotchas.md)
+
+### The 2026-06-01 `build-and-push.sh` Syntax Error (Root Cause)
+
+**Mistake**: Used HCL-style indexed array syntax when constructing `--set` overrides for `docker buildx bake`:
+
+```bash
+# WRONG (what was originally written)
+SET_TAGS+=("regular.tags[0]=$REPO:tag-cuda12.8")
+SET_TAGS+=("regular.tags[1]=$REPO:tag")
+```
+
+**Correct** (Jem's fix, now in the script):
+
+```bash
+# CORRECT
+SET_TAGS+=("regular.tags=$REPO:tag-cuda12.8")   # = replaces the whole list
+SET_TAGS+=("regular.tags+=$REPO:tag")           # += appends
+```
+
+**Why the hallucination occurred**:
+- Deep familiarity with the HCL file where `tags = [ "a", "b" ]` is a real list.
+- Mental model bleed: treating the Bake CLI override DSL as if it were HCL array indexing.
+- The `docker buildx bake --set` mechanism uses its own tiny language (`key=value` replaces, `key+=value` appends for lists). It does **not** support `[0]`, `[1]` notation.
+
+**Permanent rule for this repo**:
+Any time you are writing or modifying anything that calls `docker buildx bake --set`, you **must** consult `docs/docker-buildx-bake-gotchas.md` first.
+
+This note exists so the same context-bleed error is never repeated in any Docker/RunPod image work in this project.
+
+---
+
 ## Sprint 1 — COMPLETE (this file created during scaffolding)
 
 - [x] Full analysis of original repo structure and the critical runpod-slim first-boot mechanism.
@@ -78,6 +114,14 @@ These are mostly transitive from the above nodes. Key ones that benefit from bak
 - How to handle the single `websocket_image_save.py` (find source or recreate as a tiny custom node).
 
 **Action**: In Sprint 2 or 3 we will do a surgical "add user snapshot nodes" pass (new ARGs in docker-bake.hcl, download blocks in Dockerfile, update fetch-hashes.sh, update docs).
+
+### User Decisions Recorded (2026-06-01)
+
+- **Docker Hub namespace**: `brakhet/comfyui-wai-illustrious` (personal account, NSFW mention intentionally dropped from public image name).
+- **Primary target GPUs**: RTX 4090 class (Ada Lovelace 24 GB). Should also work on Ampere but Ampere has known limitations with newer stacks. Docs should note 40-series/50-series (Blackwell) as primary, flag low-VRAM guidance only when genuinely needed.
+- **Default batch behavior**: Prefer batch size 1 unless there is a strong reason otherwise for SDXL + Illustrious workflows.
+- **Volume layout**: Strongly prefers the nested ComfyUI layout (`/workspace/runpod-slim/ComfyUI/models/...`) over top-level `/workspace/models`. This matches how the image "mounts" the data and is more universally compatible. Legacy top-level files from serverless workers exist but are not preferred going forward.
+- **Low VRAM flags**: Only surface `--lowvram` / `--force-fp16` guidance for cards that actually need it on the 40/50-series (4090/5090). Do not make it the default.
 
 ---
 

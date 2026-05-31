@@ -86,6 +86,43 @@ After first boot you will have:
 - RunPod account with a Network Volume (at least 100–200 GB recommended for Illustrious + video models + outputs).
 - Git.
 
+### First-Time Docker Image Build Checklist (Critical if you've never done this before)
+
+Because you mentioned this is your first Docker image, do these steps **in order** before running any build:
+
+1. **Create the repository on Docker Hub**
+   - Go to https://hub.docker.com/repositories
+   - Click "Create repository"
+   - Name: `comfyui-wai-illustrious`
+   - Visibility: Private (recommended while you iterate) or Public
+   - Leave the other settings default. Click Create.
+
+2. **Create a Docker Hub Personal Access Token (you cannot use your normal password for `docker login`)**
+   - Go to https://hub.docker.com/settings/security
+   - Click "New Access Token"
+   - Name: `comfyui-wai-illustrious-laptop`
+   - Permissions: **Read & Write** (this is required to push images)
+   - Click Generate
+   - **Copy the token immediately** — you will only see it once. Save it somewhere safe (password manager).
+
+3. **Confirm Docker Desktop is using WSL2 backend**
+   - Open Docker Desktop → Settings → General
+   - Make sure "Use the WSL 2 based engine" is checked.
+   - Go to Settings → Resources → WSL Integration
+   - Ensure your Ubuntu distro is toggled on.
+   - Restart Docker Desktop if you changed anything.
+
+4. **Open the real Ubuntu terminal (not PowerShell)**
+   - Search for "Ubuntu" in the Start Menu and launch it.
+   - This is where all build commands should run.
+
+5. **First `docker login` (do this once)**
+   In the Ubuntu terminal:
+   ```bash
+   docker login -u brakhet
+   ```
+   When it asks for password, **paste the Personal Access Token** you just created (it will not echo).
+
 ---
 
 ## Step-by-Step: From Fork to Running Pod
@@ -112,8 +149,8 @@ Open `docker-bake.hcl` and change the tag prefixes in the `regular`, `dev`, `cud
 
 ```hcl
 tags = [
-  "robin/comfyui-wai-illustrious:${TAG}-cuda12.8",
-  "robin/comfyui-wai-illustrious:cuda12.8",
+  "brakhet/comfyui-wai-illustrious:${TAG}-cuda12.8",
+  "brakhet/comfyui-wai-illustrious:cuda12.8",
   ...
 ]
 ```
@@ -145,6 +182,8 @@ docker login
 
 See the script header for all options. It uses `docker buildx bake` under the hood and respects the pins in `docker-bake.hcl`.
 
+> **Important**: Before editing any bake-related tagging logic in the future, read [docs/docker-buildx-bake-gotchas.md](docs/docker-buildx-bake-gotchas.md). A previous version of the helper had incorrect `--set` array syntax for tags due to HCL vs. CLI override DSL confusion. The gotchas file exists to prevent recurrence.
+
 **Tag convention suggestion** (customize as you like):
 - Date-based for personal use: `2026-06-01-cuda12.8`
 - Or lightweight semver: `v1.0.0-cuda12.8`
@@ -153,7 +192,7 @@ See the script header for all options. It uses `docker buildx bake` under the ho
 ### 4. Create the RunPod Template (one time, then update as needed)
 
 1. Go to RunPod → Templates → New Template.
-2. **Container Image**: `yourusername/comfyui-wai-illustrious:2026-06-01-cuda12.8` (or whatever you pushed).
+2. **Container Image**: `brakhet/comfyui-wai-illustrious:2026-06-01-cuda12.8` (or whatever you pushed).
 3. **Container Disk**: 20–30 GB is usually plenty (the real data lives on the network volume).
 4. **Volume Mount**:
    - Volume: select your persistent network volume.

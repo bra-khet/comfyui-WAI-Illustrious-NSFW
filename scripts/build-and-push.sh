@@ -4,6 +4,19 @@
 # ============================================================================
 # Sprint 1 scaffolding artifact.
 #
+# !!! INSTITUTIONAL MEMORY — READ BEFORE EDITING TAG LOGIC !!!
+# See docs/docker-buildx-bake-gotchas.md
+#
+# The docker buildx bake --set override syntax for lists is:
+#   target.tags=foo      (first = replaces the entire list)
+#   target.tags+=bar     (subsequent += appends)
+#
+# NEVER use target.tags[0]= or target.tags[1]= style.
+# That was a hallucination caused by mental bleed from docker-bake.hcl HCL syntax.
+# The error was fixed 2026-06-01 with Jem's help after the first successful dev build.
+# ============================================================================
+
+#
 # Purpose:
 #   Provide a simple, safe, repeatable way to build and push *your personal*
 #   fork of the runpod-workers/comfyui-base image from a laptop (WSL Ubuntu
@@ -41,7 +54,7 @@
 set -euo pipefail
 
 # --- Defaults (override via env or flags) ---
-DEFAULT_PERSONAL_REPO="yourusername/comfyui-wai-illustrious"
+DEFAULT_PERSONAL_REPO="brakhet/comfyui-wai-illustrious"
 PERSONAL_REPO="${PERSONAL_REPO:-$DEFAULT_PERSONAL_REPO}"
 TARGET="regular"
 PUSH=false
@@ -62,7 +75,7 @@ Options:
   --push              Actually push to Docker Hub (default: build only)
   --tag <value>       Tag suffix (e.g. 2026-06-01, latest, v1.0.0). CUDA suffix added automatically.
   --no-cuda-suffix    Do not append -cuda12.8 / -cuda13.0 (advanced — only if you customized HCL)
-  --repo <name>       Override Docker Hub repo (e.g. robin/comfyui-wai-illustrious)
+  --repo <name>       Override Docker Hub repo (e.g. brakhet/comfyui-wai-illustrious)
   --help              Show this help
 
 Environment variables (advanced):
@@ -75,7 +88,7 @@ Examples:
   ./scripts/build-and-push.sh --target dev
 
   # Build + push a dated personal image (recommended)
-  ./scripts/build-and-push.sh --push --tag 2026-06-01 --repo robin/comfyui-wai-illustrious
+  ./scripts/build-and-push.sh --push --tag 2026-06-01 --repo brakhet/comfyui-wai-illustrious
 
   # Push floating 'latest' for the personal image
   ./scripts/build-and-push.sh --push --tag latest
@@ -170,34 +183,33 @@ fi
 # This keeps the pin variables and logic 100% in docker-bake.hcl.
 
 SET_TAGS=()
-
 if [[ "$TARGET" == "dev" ]]; then
-  # dev target is special — it uses output type docker and a simple tag
-  SET_TAGS+=("dev.tags[0]=$PERSONAL_REPO:dev")
+    # dev target is special — it uses output type docker and a simple tag
+    SET_TAGS+=("dev.tags=$PERSONAL_REPO:dev")
 elif [[ "$TARGET" == "regular" || "$TARGET" == "common" ]]; then
-  if [[ -n "$FINAL_TAG" ]]; then
-    SET_TAGS+=("regular.tags[0]=$PERSONAL_REPO:$FINAL_TAG-cuda12.8")
-    SET_TAGS+=("regular.tags[1]=$PERSONAL_REPO:$FINAL_TAG")
-  else
-    SET_TAGS+=("regular.tags[0]=$PERSONAL_REPO:slim-cuda12.8")
-    SET_TAGS+=("regular.tags[1]=$PERSONAL_REPO:slim")
-  fi
+    if [[ -n "$FINAL_TAG" ]]; then
+        # The first assignment (=) clears defaults; the second (+=) appends to the array
+        SET_TAGS+=("regular.tags=$PERSONAL_REPO:$FINAL_TAG-cuda12.8")
+        SET_TAGS+=("regular.tags+=$PERSONAL_REPO:$FINAL_TAG")
+    else
+        SET_TAGS+=("regular.tags=$PERSONAL_REPO:slim-cuda12.8")
+        SET_TAGS+=("regular.tags+=$PERSONAL_REPO:slim")
+    fi
 elif [[ "$TARGET" == "cuda13" ]]; then
-  if [[ -n "$FINAL_TAG" ]]; then
-    SET_TAGS+=("cuda13.tags[0]=$PERSONAL_REPO:$FINAL_TAG-cuda13.0")
-    SET_TAGS+=("cuda13.tags[1]=$PERSONAL_REPO:$FINAL_TAG")
-  else
-    SET_TAGS+=("cuda13.tags[0]=$PERSONAL_REPO:slim-cuda13.0")
-    SET_TAGS+=("cuda13.tags[1]=$PERSONAL_REPO:cuda13.0")
-  fi
+    if [[ -n "$FINAL_TAG" ]]; then
+        SET_TAGS+=("cuda13.tags=$PERSONAL_REPO:$FINAL_TAG-cuda13.0")
+        SET_TAGS+=("cuda13.tags+=$PERSONAL_REPO:$FINAL_TAG")
+    else
+        SET_TAGS+=("cuda13.tags=$PERSONAL_REPO:slim-cuda13.0")
+        SET_TAGS+=("cuda13.tags+=$PERSONAL_REPO:cuda13.0")
+    fi
 else
-  # Fallback for devpush / other custom targets — user is expected to know what they are doing
-  echo "Note: Using target '$TARGET' with minimal tag mangling. You may want to pass explicit tags via bake args."
-  if [[ -n "$FINAL_TAG" ]]; then
-    SET_TAGS+=("$TARGET.tags[0]=$PERSONAL_REPO:$FINAL_TAG")
-  fi
+    # Fallback for devpush / other custom targets — user is expected to know what they are doing
+    echo "Note: Using target '$TARGET' with minimal tag mangling. You may want to pass explicit tags via bake args."
+    if [[ -n "$FINAL_TAG" ]]; then
+        SET_TAGS+=("$TARGET.tags=$PERSONAL_REPO:$FINAL_TAG")
+    fi
 fi
-
 for st in "${SET_TAGS[@]}"; do
   BAKE_CMD+=(--set "$st")
 done
