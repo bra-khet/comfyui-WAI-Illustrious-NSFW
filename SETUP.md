@@ -143,21 +143,19 @@ git fetch upstream
 
 ### 2. Personalize the image name (one time)
 
-The original `docker-bake.hcl` hard-codes `runpod/comfyui`.
+`docker-bake.hcl` now contains a `PERSONAL_REPO` variable near the top (default: `brakhet/comfyui-wai-illustrious`).
 
-Open `docker-bake.hcl` and change the tag prefixes in the `regular`, `dev`, `cuda13`, etc. targets from `runpod/comfyui` to your own namespace, e.g.:
+This is the single source of truth for your personal image name. All targets (`regular`, `dev`, `cuda13`, etc.) automatically use it.
+
+If you ever want to change the namespace, edit only this one variable:
 
 ```hcl
-tags = [
-  "brakhet/comfyui-wai-illustrious:${TAG}-cuda12.8",
-  "brakhet/comfyui-wai-illustrious:cuda12.8",
-  ...
-]
+variable "PERSONAL_REPO" {
+  default = "yourname/comfyui-wai-illustrious"
+}
 ```
 
-(Replace `robin` with your Docker Hub username.)
-
-We will make this even cleaner with a `PERSONAL_REPO` variable in a future sprint if desired.
+Direct `docker buildx bake` commands (and the helper script) will now produce the correct personal tags automatically.
 
 ### 3. Local build & push (the repeatable workflow)
 
@@ -227,6 +225,41 @@ Access:
 - SSH: `ssh root@<pod-ip> -p 22` (or the proxy port)
 
 ---
+
+## First Boot Experience (Sprint 2 improvement)
+
+On the very first time your volume is used with this image, after ComfyUI is copied you will now see a clear block in the logs telling you exactly where to place:
+
+- WAI-Illustrious checkpoint (`.../models/checkpoints/`)
+- Your LoRAs (`.../models/loras/`)
+- Other assets
+
+This uses the nested layout inside `/workspace/runpod-slim/ComfyUI/models/...` that you prefer. The message only appears during the initial copy.
+
+## Optional: API Keys + Auto-Download Models via Environment Variables (new)
+
+You can set these in your RunPod **Template** (or at pod creation time) exactly like other popular ComfyUI templates:
+
+- `CIVITAI_API_KEY` — Your Civitai API key (create at https://civitai.com/user/account). This also makes the pre-baked Civicomfy node automatically authenticated for manual downloads inside the UI.
+- `HF_TOKEN` — Optional, for gated Hugging Face models (future-proofing).
+- `COMFY_INITIAL_MODELS` — Comma-separated list of **Civitai model version IDs** (the numeric part after `/models/` or from the download button). Example: `123456,789012`
+
+**Behavior**:
+- Leave `COMFY_INITIAL_MODELS` blank or unset → nothing is downloaded (the default, zero surprise behavior).
+- Provide the key + IDs → on every pod start the container will download any missing checkpoints from that list into `/workspace/runpod-slim/ComfyUI/models/checkpoints/`.
+- Fully idempotent (won't re-download on every restart).
+- Best-effort: a single bad ID or temporary rate limit will not break the pod; it just logs and continues.
+- Works on both brand-new volumes and existing ones.
+
+This gives you the "declarative model list in the template" experience you asked for while keeping the image itself lean.
+
+Example in the RunPod template UI:
+```
+CIVITAI_API_KEY = your_real_key_here
+COMFY_INITIAL_MODELS = 1234567,987654
+```
+
+The same keys are also exported into the SSH/Jupyter environment so CLI tools and nodes see them.
 
 ## Custom ComfyUI Arguments
 

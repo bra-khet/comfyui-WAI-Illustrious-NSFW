@@ -62,6 +62,27 @@ This note exists so the same context-bleed error is never repeated in any Docker
 
 ---
 
+## Sprint 2 — COMPLETE
+
+**Sprint contract**: "Introduce a PERSONAL_REPO variable in docker-bake.hcl for clean personal image naming, update the build helper to work with it, and add explicit first-boot logging in start.sh that guides users to the recommended nested WAI-Illustrious model paths under /workspace/runpod-slim/ComfyUI."
+
+**Changes delivered**:
+- Added `PERSONAL_REPO` variable to `docker-bake.hcl` (default: `brakhet/comfyui-wai-illustrious`). All tag definitions now use it.
+- Direct `docker buildx bake` calls now produce correct personal tags (no longer hard-coded to runpod namespace).
+- `scripts/build-and-push.sh` updated with comments reflecting the new source of truth.
+- Added prominent, friendly first-boot guidance block in `start.sh` (only shown on initial volume copy) explaining exactly where to place WAI-Illustrious + LoRAs using the nested layout the user prefers.
+- Added `docs/docker-buildx-bake-gotchas.md` + institutional memory section in this file (from previous work).
+
+**Verified**:
+- No breakage to existing bake targets or start.sh logic.
+- The first-boot copy mechanism and volume behavior remain untouched.
+
+**End of Sprint 2 statement**: "Sprint 2 complete — personal naming centralized + first-boot UX guidance added. Environment ready for real RunPod testing and Sprint 3 (snapshot custom node integration)."
+
+Next up: Sprint 3 will focus on integrating the high-value nodes from the 2026-05-31 snapshot (Impact-Pack, IPAdapter, WanVideoWrapper, etc.) using the established pinned-tarball pattern.
+
+---
+
 ## User's Current ComfyUI Snapshot (2026-05-31_14-48-25_snapshot.json)
 
 **Source**: Taken from user's production personal ComfyUI setup. This is the authoritative list of what the user actually uses and wants preserved/reproduced in the personal pod template.

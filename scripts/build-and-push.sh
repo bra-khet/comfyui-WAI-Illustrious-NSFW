@@ -24,9 +24,9 @@
 #
 # Why this script exists:
 #   - The original repo is designed for the official runpod/ namespace + CI.
-#   - For a personal fork you want your own Docker Hub repo (e.g. robin/comfyui-wai-illustrious)
+#   - For a personal fork you want your own Docker Hub repo (controlled by PERSONAL_REPO in docker-bake.hcl)
 #     and easy date-based or semver tags without editing HCL every time.
-#   - Keeps the heavy lifting in docker-bake.hcl (single source of truth for pins).
+#   - Keeps the heavy lifting in docker-bake.hcl (single source of truth for pins + personal namespace).
 #
 # Usage (from WSL Ubuntu terminal):
 #   ./scripts/build-and-push.sh --help
@@ -88,6 +88,7 @@ Examples:
   ./scripts/build-and-push.sh --target dev
 
   # Build + push a dated personal image (recommended)
+  # Note: PERSONAL_REPO in docker-bake.hcl is now the primary source of truth.
   ./scripts/build-and-push.sh --push --tag 2026-06-01 --repo brakhet/comfyui-wai-illustrious
 
   # Push floating 'latest' for the personal image

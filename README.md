@@ -23,6 +23,7 @@ All heavy assets (WAI-Illustrious checkpoint, your LoRAs, outputs, workflows, an
 - One-time copy of the clean base to your persistent volume.
 - FileBrowser (8080), JupyterLab (8888), SSH (22), and ComfyUI (8188).
 - `comfyui_args.txt` for custom launch flags.
+- Optional env-var driven Civitai checkpoint downloads on start (`CIVITAI_API_KEY` + `COMFY_INITIAL_MODELS`).
 
 Everything else (your real models, LoRAs, extra nodes from the snapshot, workflows) goes on the network volume and survives pod restarts and image upgrades.
 

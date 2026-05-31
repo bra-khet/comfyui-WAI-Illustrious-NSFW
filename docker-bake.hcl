@@ -2,6 +2,11 @@ variable "TAG" {
   default = "slim"
 }
 
+# Personal image namespace (source of truth for this fork)
+variable "PERSONAL_REPO" {
+  default = "brakhet/comfyui-wai-illustrious"
+}
+
 # === Version Pins (single source of truth) ===
 variable "COMFYUI_VERSION" {
   default = "v0.18.2"
@@ -74,28 +79,28 @@ target "common" {
 target "regular" {
   inherits = ["common"]
   tags = [
-    "runpod/comfyui:${TAG}-cuda12.8",
-    "runpod/comfyui:cuda12.8",
-    "runpod/comfyui:latest",
+    "${PERSONAL_REPO}:${TAG}-cuda12.8",
+    "${PERSONAL_REPO}:cuda12.8",
+    "${PERSONAL_REPO}:latest",
   ]
 }
 
 # Dev image for local testing
 target "dev" {
   inherits = ["common"]
-  tags = ["runpod/comfyui:dev"]
+  tags = ["${PERSONAL_REPO}:dev"]
   output = ["type=docker"]
 }
 
 # Dev push targets (for CI pushing dev tags, without overriding latest)
 target "devpush" {
   inherits = ["common"]
-  tags = ["runpod/comfyui:dev-cuda12.8"]
+  tags = ["${PERSONAL_REPO}:dev-cuda12.8"]
 }
 
 target "devpush-cuda13" {
   inherits = ["common"]
-  tags = ["runpod/comfyui:dev-cuda13.0"]
+  tags = ["${PERSONAL_REPO}:dev-cuda13.0"]
   args = {
     TORCH_VERSION       = TORCH_VERSION_5090
     TORCHVISION_VERSION = TORCHVISION_VERSION_5090
@@ -109,8 +114,8 @@ target "devpush-cuda13" {
 target "cuda13" {
   inherits = ["common"]
   tags = [
-    "runpod/comfyui:${TAG}-cuda13.0",
-    "runpod/comfyui:cuda13.0",
+    "${PERSONAL_REPO}:${TAG}-cuda13.0",
+    "${PERSONAL_REPO}:cuda13.0",
   ]
   args = {
     TORCH_VERSION       = TORCH_VERSION_5090

@@ -57,7 +57,9 @@ export_env_vars() {
     > "$SSH_ENV_DIR"
     
     # Export to multiple locations for maximum compatibility
-    printenv | grep -E '^RUNPOD_|^PATH=|^_=|^CUDA|^LD_LIBRARY_PATH|^PYTHONPATH' | while read -r line; do
+    # CHANGED: Widened grep to include CIVITAI_* and HF_* so API keys reach Civicomfy node + any download helpers
+    # WHY: User request for standard RunPod template behavior where setting CIVITAI_API_KEY in the pod template makes authenticated Civitai downloads (and the baked Civicomfy node) work out of the box
+    printenv | grep -E '^RUNPOD_|^PATH=|^_=|^CUDA|^LD_LIBRARY_PATH|^PYTHONPATH|^CIVITAI_|^HF_' | while read -r line; do
         # Get variable name and value
         name=$(echo "$line" | cut -d= -f1)
         value=$(echo "$line" | cut -d= -f2-)
@@ -100,6 +102,70 @@ start_jupyter() {
         --IdentityProvider.token="${JUPYTER_PASSWORD:-}" \
         --ServerApp.allow_origin=* &> /jupyter.log &
     echo "Jupyter Lab started"
+}
+
+# Download optional initial Civitai checkpoints declared via env var (MVP per 2026-06 sprint)
+# Supports: CIVITAI_API_KEY (or CIVITAI_TOKEN fallback) + COMFY_INITIAL_MODELS="123456,789012"
+# Behavior: idempotent (marker file + disk existence check), best-effort (never breaks pod), runs every start
+download_civitai_checkpoints() {
+    local models_var="${COMFY_INITIAL_MODELS:-}"
+    local key="${CIVITAI_API_KEY:-${CIVITAI_TOKEN:-}}"
+
+    # CHANGED: New function for declarative first-boot / every-start model pulls
+    # WHY: User wants the same "set key + comma list of Civitai version IDs in RunPod template env vars, blank means do nothing" experience seen in other templates, while keeping the image lean and volumes fully user-owned
+    # Sync: Keep behavior consistent with the first-boot guidance echo block and SETUP.md docs
+
+    [ -z "$models_var" ] && return 0
+    if [ -z "$key" ]; then
+        echo "NOTE: COMFY_INITIAL_MODELS is set but CIVITAI_API_KEY is not — skipping auto-downloads (models will be missing until added manually or key is provided)"
+        return 0
+    fi
+
+    local marker="/workspace/runpod-slim/.initial_civitai_models"
+    touch "$marker" 2>/dev/null || true
+
+    # Split on commas, trim whitespace
+    local IFS=','
+    for raw_id in $models_var; do
+        local id
+        id=$(echo "$raw_id" | xargs)   # trim leading/trailing spaces
+        [ -z "$id" ] && continue
+
+        # Already handled in a previous run?
+        if grep -q "^${id}$" "$marker" 2>/dev/null; then
+            echo "  [skip] Civitai version ${id} already recorded as downloaded"
+            continue
+        fi
+
+        local outdir="/workspace/runpod-slim/ComfyUI/models/checkpoints"
+        mkdir -p "$outdir"
+
+        # Try to discover a nice filename from the download headers (Civitai sends Content-Disposition)
+        local filename
+        filename=$(curl -sI -L --max-time 15 "https://civitai.com/api/download/models/${id}?token=${key}" 2>/dev/null | tr -d '\r' | grep -i 'content-disposition' | sed -E 's/.*filename="?([^";]+).*/\1/' | head -1 | xargs)
+        if [ -z "$filename" ]; then
+            filename="civitai_v${id}.safetensors"
+        fi
+
+        local dest="$outdir/$filename"
+
+        if [ -f "$dest" ]; then
+            echo "  [skip] $filename already present on disk for version ${id}"
+            echo "$id" >> "$marker"
+            continue
+        fi
+
+        echo "  Downloading Civitai model version ${id} → ${filename} ..."
+        if curl -L --fail --max-time 600 --retry 2 --retry-delay 3 \
+                -o "$dest" \
+                "https://civitai.com/api/download/models/${id}?token=${key}" 2>&1; then
+            echo "  ✓ Successfully downloaded ${filename}"
+            echo "$id" >> "$marker"
+        else
+            echo "  ✗ Download failed for version ${id} (check that the key has download permissions, the ID is valid, and you are not rate-limited). Continuing without it..."
+            rm -f "$dest" 2>/dev/null || true
+        fi
+    done
 }
 
 # ---------------------------------------------------------------------------- #
@@ -180,6 +246,28 @@ if [ ! -d "$COMFYUI_DIR" ] || [ ! -d "$VENV_DIR" ]; then
     if [ ! -d "$COMFYUI_DIR" ]; then
         cp -r /opt/comfyui-baked "$COMFYUI_DIR"
         echo "ComfyUI copied to workspace"
+
+        # === WAI-Illustrious personal template guidance (Sprint 2 addition) ===
+        echo "======================================================================"
+        echo "  WAI-Illustrious Live Pod — Recommended Volume Layout"
+        echo "======================================================================"
+        echo "Place your models here (nested inside the ComfyUI tree on the volume):"
+        echo "  /workspace/runpod-slim/ComfyUI/models/checkpoints/   ← WAI-Illustrious.safetensors"
+        echo "  /workspace/runpod-slim/ComfyUI/models/loras/         ← your character / anatomy / style LoRAs"
+        echo "  /workspace/runpod-slim/ComfyUI/models/vae/"
+        echo "  /workspace/runpod-slim/ComfyUI/models/embeddings/"
+        echo ""
+        echo "Outputs and workflows will be saved under:"
+        echo "  /workspace/runpod-slim/ComfyUI/output/"
+        echo "  /workspace/runpod-slim/ComfyUI/user/default/workflows/"
+        echo ""
+        echo "This nested layout is the recommended structure for this template."
+        echo "It survives image updates and works consistently across deploys."
+        echo ""
+        echo "Alternative (new): set CIVITAI_API_KEY + COMFY_INITIAL_MODELS=\"123456,789012\""
+        echo "in your RunPod template env vars. On any start the pod will auto-download"
+        echo "those Civitai checkpoint versions (idempotent). Leave the var blank for zero downloads."
+        echo "======================================================================"
     fi
 
     # Create venv with access to system packages (torch, numpy, etc. pre-installed in image)
@@ -199,6 +287,9 @@ else
     source "$VENV_DIR/bin/activate"
     echo "Using existing ComfyUI installation"
 fi
+
+# Optional: pull any Civitai checkpoints the user declared via env vars (idempotent, safe to run every start)
+download_civitai_checkpoints
 
 # Warm up pip so ComfyUI-Manager's 5s timeout check doesn't fail on cold start
 python -m pip --version > /dev/null 2>&1
